@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 큐브 - 3면 연속 webcam ASCII (최적화)</title>
+    <title>who weaves web-v1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
@@ -24,9 +24,9 @@
         @font-face {
             font-family: 'Interop';
             src: url('https://raw.githubusercontent.com/payw-org/Interop/main/web/fonts/Interop-Regular.woff2')
-                format('woff2'),
-                url('https://raw.githubusercontent.com/payw-org/Interop/main/web/fonts/Interop-Regular.woff')
-                format('woff');
+                        format('woff2'),
+                    url('https://raw.githubusercontent.com/payw-org/Interop/main/web/fonts/Interop-Regular.woff')
+                        format('woff');
             font-weight: normal;
             font-style: normal;
             font-display: block;
@@ -152,7 +152,7 @@
             width: 100vw;
             height: 100vh;
             pointer-events: auto;
-            z-index: 9999;
+            z-index: 9999; /* 오버레이 자체가 마우스 이벤트를 받습니다. */
             background: transparent !important;
         }
         .overlay-placed-text {
@@ -167,7 +167,7 @@
             border: none;
             box-shadow: none;
             padding: 5px;
-            z-index: 2;
+            z-index: 2; /* 기존 텍스트 z-index 유지 */
             user-select: none;
             color: #2b00ff !important;
             pointer-events: none;
@@ -175,7 +175,7 @@
         }
         .overlay-text-input-box {
             position: absolute;
-            z-index: 10001;
+            z-index: 10001; /* 입력 박스는 마우스 흔적/궤적보다도 위에 */
             display: flex;
             justify-content: center;
             align-items: flex-start;
@@ -213,7 +213,7 @@
         .custom-caret {
             display: block;
             position: absolute;
-            width: 0.1rem; /* 커서 두께 */
+            width: 0.6rem; /* 커서 두께 */
             background: #2b00ff;
             z-index: 3;
             pointer-events: none;
@@ -231,6 +231,29 @@
             height: 0;
             pointer-events: none;
         }
+
+        /* --- 추가: 클릭 마크 스타일 --- */
+        .click-mark {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%; /* 원형 */
+            background-color: #FF3300; /* 빨간색 반투명 */
+            position: absolute;
+            pointer-events: none; /* 클릭 이벤트를 방해하지 않도록 설정 */
+            z-index: 10000; /* 오버레이(9999)보다 위에, 입력 박스(10001)보다는 아래에 위치 */
+            transform: translate(-50%, -50%); /* 클릭 위치 중앙에 오도록 조정 */
+        }
+
+        /* --- 추가: 마우스 궤적 캔버스 스타일 (HTML에 직접 스타일 추가됨) --- */
+        /* #mousePathCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 10000;
+        } */
     </style>
 </head>
 <body>
@@ -258,7 +281,13 @@
             </div>
         </div>
     </div>
+
+    <!-- 마우스 궤적을 위한 캔버스 추가: z-index를 오버레이(9999)보다 높게 설정 -->
+    <canvas id="mousePathCanvas"
+      style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:10000;"></canvas>
+
     <div class="transparent-overlay" id="overlay"></div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- webcam/ascii art 부분 ---
@@ -469,11 +498,16 @@
                     );
                     overlayCurrentInputBox = null;
                 }
+                // 기존 텍스트 입력 관련 요소들을 클릭했을 때는 새로운 입력 박스를 생성하지 않음
                 if (event.target.classList.contains('overlay-placed-text')
                     || event.target.classList.contains('overlay-text-input-box')
-                    || event.target.tagName === 'TEXTAREA') {
+                    || event.target.tagName === 'TEXTAREA'
+                    || event.target.classList.contains('click-mark') /* 추가: 클릭 마크 자체를 클릭 시 반응 안 함 */
+                    || event.target.id === 'mousePathCanvas' /* 추가: 궤적 캔버스 클릭 시 반응 안 함 */
+                    ) {
                     return;
                 }
+                
                 // 입력 위치: 가장 가까운 줄에 snap
                 const overlayRect = overlay.getBoundingClientRect();
                 const x = event.clientX;
@@ -658,6 +692,7 @@
                 inputContainer.style.transform = `translate(-50%, 0) ${textFlipTransform}`;
                 const textarea = document.createElement('textarea');
                 textarea.style.color = '#000000';
+                textarea.style.marginLeft = '0px';
                 inputContainer.appendChild(textarea);
                 side.appendChild(inputContainer);
                 textarea.focus();
@@ -699,6 +734,80 @@
                 }
                 inputContainer.remove();
             }
+            
+            // ======================================
+            // 1. 커서 클릭 시 해당 위치에 모양 새기기 (transparent-overlay에 이벤트 리스너 부착)
+            // ======================================
+            overlay.addEventListener('click', (event) => {
+                // 기존 overlay 텍스트 입력 박스 클릭 방지 로직은 그대로 유지
+                if (event.target.classList.contains('overlay-placed-text')
+                    || event.target.classList.contains('overlay-text-input-box')
+                    || event.target.tagName === 'TEXTAREA'
+                    || event.target.classList.contains('click-mark') /* 추가: 클릭 마크 자체를 클릭 시 반응 안 함 */
+                    || event.target.id === 'mousePathCanvas' /* 추가: 궤적 캔버스 클릭 시 반응 안 함 */
+                    ) {
+                    return;
+                }
+
+                const clickMark = document.createElement('div');
+                clickMark.className = 'click-mark'; // CSS 클래스 사용
+                clickMark.style.left = `${event.clientX}px`; 
+                clickMark.style.top = `${event.clientY}px`; 
+                document.body.appendChild(clickMark); /* body에 추가하여 z-index로 띄움 */
+
+                // 시각적인 확인을 위해 클릭 마크를 잠시 후에 제거할 수도 있습니다.
+                // setTimeout(() => {
+                //     clickMark.remove();
+                // }, 1000); 
+            });
+
+            // ======================================
+            // 2. 마우스 움직이는 궤적을 얇은 선으로 기록하기 (transparent-overlay에 이벤트 리스너 부착)
+            // ======================================
+            const mousePathCanvas = document.getElementById('mousePathCanvas');
+            const mousePathCtx = mousePathCanvas.getContext('2d');
+
+            // 캔버스 크기를 뷰포트에 맞게 설정
+            mousePathCanvas.width = window.innerWidth;
+            mousePathCanvas.height = window.innerHeight;
+
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+            
+            // 윈도우 크기가 변경될 때 캔버스 크기 재설정
+            window.addEventListener('resize', () => {
+                mousePathCanvas.width = window.innerWidth;
+                mousePathCanvas.height = window.innerHeight;
+                // 캔버스 크기 변경 시 기존 궤적은 지워집니다.
+            });
+
+            // mousemove 이벤트를 overlay에 부착
+            overlay.addEventListener('mousemove', (event) => {
+                // 기존 overlay 텍스트 입력 박스 위에서는 궤적을 그리지 않음
+                if (event.target.classList.contains('overlay-text-input-box')
+                    || event.target.tagName === 'TEXTAREA') {
+                    lastMouseX = event.clientX; // 궤적 끊김 방지를 위해 마지막 위치 업데이트
+                    lastMouseY = event.clientY;
+                    return;
+                }
+                
+                // 첫 움직임일 경우 현재 마우스 위치를 시작점으로 설정
+                if (lastMouseX === 0 && lastMouseY === 0) {
+                    lastMouseX = event.clientX;
+                    lastMouseY = event.clientY;
+                    return;
+                }
+
+                mousePathCtx.beginPath();
+                mousePathCtx.moveTo(lastMouseX, lastMouseY);
+                mousePathCtx.lineTo(event.clientX, event.clientY);
+                mousePathCtx.strokeStyle = 'rgb(43, 0, 255)'; // 파란색 반투명 선
+                mousePathCtx.lineWidth = 1; // 얇은 선
+                mousePathCtx.stroke();
+
+                lastMouseX = event.clientX;
+                lastMouseY = event.clientY;
+            });
         });
     </script>
 </body>
