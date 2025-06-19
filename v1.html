@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>whoweavesweb-v1</title>
+    <title>3D 큐브 - 3면 연속 webcam ASCII (최적화)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
@@ -386,45 +386,6 @@
             const overlay = document.getElementById('overlay');
             let overlayCurrentInputBox = null;
 
-            // 로컬스토리지 key
-            const OVERLAY_TEXTS_STORAGE_KEY = "overlayPlacedTextsV1";
-
-            /* 입력 위치/텍스트/스타일(폭, 폰트 등) 저장용
-            function saveOverlayPlacedTexts() {
-                const placed = Array.from(document.querySelectorAll('.overlay-placed-text')).map(node => ({
-                    text: node.textContent,
-                    left: node.style.left,
-                    top: node.style.top,
-                    width: node.style.width,
-                    fontFamily: node.style.fontFamily,
-                    fontSize: node.style.fontSize,
-                    lineHeight: node.style.lineHeight,
-                    padding: node.style.padding,
-                    transform: node.style.transform
-                }));
-                localStorage.setItem(OVERLAY_TEXTS_STORAGE_KEY, JSON.stringify(placed));
-            }*/
-            function loadOverlayPlacedTexts() {
-                const arr = JSON.parse(localStorage.getItem(OVERLAY_TEXTS_STORAGE_KEY) || "[]");
-                arr.forEach(obj => {
-                    const placedText = document.createElement('div');
-                    placedText.className = 'overlay-placed-text';
-                    placedText.textContent = obj.text;
-                    placedText.style.left = obj.left;
-                    placedText.style.top = obj.top;
-                    placedText.style.width = obj.width;
-                    placedText.style.whiteSpace = 'pre-wrap';
-                    placedText.style.fontFamily = obj.fontFamily;
-                    placedText.style.fontSize = obj.fontSize;
-                    placedText.style.lineHeight = obj.lineHeight;
-                    placedText.style.padding = obj.padding;
-                    placedText.style.transform = obj.transform || 'translateY(0)';
-                    overlay.appendChild(placedText);
-                });
-            }
-            // 페이지 진입시 불러오기
-            loadOverlayPlacedTexts();
-
             function autosizeTextarea(textarea) {
                 textarea.style.height = 'auto';
                 textarea.style.width = 'auto';
@@ -658,8 +619,6 @@
                     placedText.style.lineHeight = window.getComputedStyle(textarea).lineHeight;
                     placedText.style.padding = window.getComputedStyle(textarea).padding;
                     overlay.appendChild(placedText);
-                    // 저장
-                    saveOverlayPlacedTexts();
                 }
                 if (inputBox) inputBox.remove();
             }
