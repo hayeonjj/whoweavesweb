@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>whoweavesweb-v1</title>
+    <title>3D 큐브 - 3면 연속 webcam ASCII (최적화)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
@@ -158,8 +158,8 @@
         .overlay-placed-text {
             position: absolute;
             font-family: 'Interop', sans-serif;
-            font-size: 1rem;
-            font-weight: 500;
+            font-size: 1.25rem;
+            font-weight: 600;
             line-height: 1.25;
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -184,8 +184,8 @@
         }
         .overlay-text-input-box textarea {
             font-family: 'Interop', sans-serif;
-            font-size: 1rem;
-            font-weight: 500;
+            font-size: 1.25rem;
+            font-weight: 600;
             line-height: 1.25;
             color: #2b00ff !important;
             background: transparent;
@@ -206,14 +206,14 @@
             word-wrap: break-word;
             pointer-events: auto;
             display: block;
-            caret-color: transparent; /* 기본 caret 숨김 */
+            caret-color: transparent;
             position: relative;
             z-index: 2;
         }
         .custom-caret {
             display: block;
             position: absolute;
-            width: 0.55rem; /* 커서 두께 */
+            width: 0.6rem;
             background: #2b00ff;
             z-index: 3;
             pointer-events: none;
@@ -223,7 +223,6 @@
             0%, 60% { opacity: 1; }
             60%, 100% { opacity: 0; }
         }
-        /* ====== 텍스트 줄 가이드 ====== */
         .text-line-guide {
             position: absolute;
             left: 0;
@@ -259,8 +258,41 @@
         </div>
     </div>
     <div class="transparent-overlay" id="overlay"></div>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDyFyIdnj9pJ9tNt7YgcgXzPAZ0NYrm5oI",
+            authDomain: "whoweavesweb.firebaseapp.com",
+            projectId: "whoweavesweb",
+            storageBucket: "whoweavesweb.appspot.com",
+            messagingSenderId: "917246566348",
+            appId: "1:917246566348:web:d1fcc3bdf12fb85c260769",
+            measurementId: "G-4GMPWDYN67"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        async function saveOverlayPlacedTextsToFirebase(placedTexts) {
+            await setDoc(doc(db, "overlayTexts", "defaultUser"), {
+                placed: placedTexts
+            });
+        }
+        async function loadOverlayPlacedTextsFromFirebase() {
+            const docSnap = await getDoc(doc(db, "overlayTexts", "defaultUser"));
+            if (docSnap.exists()) {
+                return docSnap.data().placed || [];
+            } else {
+                return [];
+            }
+        }
+
+        // DOMContentLoaded 없이 즉시실행(async) 함수로 감싸서 실행
+        (async () => {
             // --- webcam/ascii art 부분 ---
             const asciiSides = [
                 { id: 'asciiCanvas-left', sideId: 'left-side' },
@@ -386,11 +418,7 @@
             const overlay = document.getElementById('overlay');
             let overlayCurrentInputBox = null;
 
-            // 로컬스토리지 key
-            const OVERLAY_TEXTS_STORAGE_KEY = "overlayPlacedTextsV1";
-
-            // 입력 위치/텍스트/스타일(폭, 폰트 등) 저장용
-            function saveOverlayPlacedTexts() {
+            async function saveOverlayPlacedTexts() {
                 const placed = Array.from(document.querySelectorAll('.overlay-placed-text')).map(node => ({
                     text: node.textContent,
                     left: node.style.left,
@@ -402,10 +430,10 @@
                     padding: node.style.padding,
                     transform: node.style.transform
                 }));
-                localStorage.setItem(OVERLAY_TEXTS_STORAGE_KEY, JSON.stringify(placed));
+                await saveOverlayPlacedTextsToFirebase(placed);
             }
-            function loadOverlayPlacedTexts() {
-                const arr = JSON.parse(localStorage.getItem(OVERLAY_TEXTS_STORAGE_KEY) || "[]");
+            async function loadOverlayPlacedTexts() {
+                const arr = await loadOverlayPlacedTextsFromFirebase();
                 arr.forEach(obj => {
                     const placedText = document.createElement('div');
                     placedText.className = 'overlay-placed-text';
@@ -422,8 +450,7 @@
                     overlay.appendChild(placedText);
                 });
             }
-            // 페이지 진입시 불러오기
-            loadOverlayPlacedTexts();
+            await loadOverlayPlacedTexts();
 
             function autosizeTextarea(textarea) {
                 textarea.style.height = 'auto';
@@ -458,17 +485,15 @@
             }
             overlay.addEventListener('wheel', handlePerspectiveWheel, { passive: false });
 
-            // ==== 텍스트 줄 가이드 및 입력 ====
-            const overlayLineCount = 24; // 줄의 개수 (원하는 대로 조정)
+            const overlayLineCount = 24;
             let overlayLineTops = [];
 
             function makeOverlayTextLines() {
-                // 이전 라인 지우기
                 overlay.querySelectorAll('.text-line-guide').forEach(n => n.remove());
                 overlayLineTops = [];
                 const overlayRect = overlay.getBoundingClientRect();
                 for (let i = 0; i < overlayLineCount; i++) {
-                    const y = (i + 1) * overlayRect.height / (overlayLineCount + 1); // 0~height 사이 등분
+                    const y = (i + 1) * overlayRect.height / (overlayLineCount + 1);
                     overlayLineTops.push(y);
                     const line = document.createElement('div');
                     line.className = 'text-line-guide';
@@ -480,7 +505,6 @@
             window.addEventListener('resize', makeOverlayTextLines);
 
             overlay.addEventListener('mousemove', function(event) {
-                // 가장 가까운 줄만 active로
                 const mouseY = event.clientY;
                 let minDist = Infinity;
                 let closestIdx = -1;
@@ -500,9 +524,9 @@
                 overlay.querySelectorAll('.text-line-guide').forEach(el => el.classList.remove('active'));
             });
 
-            overlay.addEventListener('click', function(event) {
+            overlay.addEventListener('click', async function(event) {
                 if (overlayCurrentInputBox) {
-                    finalizeOverlayTextInput(
+                    await finalizeOverlayTextInput(
                         overlayCurrentInputBox.querySelector('textarea'),
                         overlayCurrentInputBox
                     );
@@ -513,7 +537,6 @@
                     || event.target.tagName === 'TEXTAREA') {
                     return;
                 }
-                // 입력 위치: 가장 가까운 줄에 snap
                 const overlayRect = overlay.getBoundingClientRect();
                 const x = event.clientX;
                 const y = event.clientY;
@@ -530,7 +553,6 @@
 
                 const inputBox = document.createElement('div');
                 inputBox.className = 'overlay-text-input-box';
-                // 왼쪽 정렬을 위해 translateY만 적용, left/top 그대로
                 inputBox.style.left = x + 'px';
                 inputBox.style.top = lineY + 'px';
                 inputBox.style.transform = 'translateY(0)';
@@ -540,7 +562,6 @@
                 textarea.style.marginLeft = '0px';
                 inputBox.appendChild(textarea);
 
-                // 커스텀 caret
                 const caret = document.createElement('div');
                 caret.className = 'custom-caret';
                 caret.style.display = 'block';
@@ -550,7 +571,6 @@
                 textarea.focus();
                 overlayCurrentInputBox = inputBox;
 
-                // 정교한 커서 위치 계산 함수
                 function updateCustomCaret() {
                     let value = textarea.value;
                     let selection = textarea.selectionStart;
@@ -626,28 +646,27 @@
                     updateCustomCaret();
                 }, 0);
 
-                textarea.addEventListener('keydown', (e) => {
+                textarea.addEventListener('keydown', async (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        finalizeOverlayTextInput(textarea, inputBox, x, lineY);
+                        await finalizeOverlayTextInput(textarea, inputBox, x, lineY);
                         overlayCurrentInputBox = null;
                     }
                 });
-                textarea.addEventListener('focusout', () => {
+                textarea.addEventListener('focusout', async () => {
                     if (overlayCurrentInputBox === inputBox) {
-                        finalizeOverlayTextInput(textarea, inputBox, x, lineY);
+                        await finalizeOverlayTextInput(textarea, inputBox, x, lineY);
                         overlayCurrentInputBox = null;
                     }
                 });
             });
 
-            function finalizeOverlayTextInput(textarea, inputBox, x, y) {
+            async function finalizeOverlayTextInput(textarea, inputBox, x, y) {
                 const text = textarea.value.trim();
                 if (text) {
                     const placedText = document.createElement('div');
                     placedText.className = 'overlay-placed-text';
                     placedText.textContent = text;
-                    // translateY만 적용, left/top 그대로
                     placedText.style.left = x + 'px';
                     placedText.style.top = y + 'px';
                     placedText.style.transform = 'translateY(0)';
@@ -658,13 +677,11 @@
                     placedText.style.lineHeight = window.getComputedStyle(textarea).lineHeight;
                     placedText.style.padding = window.getComputedStyle(textarea).padding;
                     overlay.appendChild(placedText);
-                    // 저장
-                    saveOverlayPlacedTexts();
+                    await saveOverlayPlacedTexts();
                 }
                 if (inputBox) inputBox.remove();
             }
 
-            // ====== 기존 top/bottom 텍스트 입력 유지 ======
             let currentInputBox = null;
             document.getElementById('top-side').addEventListener('click', (event) => sideClickHandler(event, 'top'));
             document.getElementById('bottom-side').addEventListener('click', (event) => sideClickHandler(event, 'bottom'));
@@ -740,7 +757,7 @@
                 }
                 inputContainer.remove();
             }
-        });
+        })();
     </script>
 </body>
 </html>
