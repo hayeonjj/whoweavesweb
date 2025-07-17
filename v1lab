@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>who weaves web-v1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cube-size: 800px;
+            --cube-depth: calc(var(--cube-size) / 2);
+            --perspective-value: 180px;
+        }
+        *, *::before, *::after { padding: 0; margin: 0; box-sizing: border-box; }
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        @font-face {
+            font-family: 'Interop';
+            src: url('https://raw.githubusercontent.com/payw-org/Interop/main/web/fonts/Interop-Regular.woff2') format('woff2'),
+                 url('https://raw.githubusercontent.com/payw-org/Interop/main/web/fonts/Interop-Regular.woff') format('woff');
+            font-weight: normal; font-style: normal; font-display: block;
+        }
+        body {
+            background-color: white;
+            width: 100vw; height: 100vh;
+            display: flex; justify-content: center; align-items: center; overflow: hidden;
+            font-family: 'Interop', sans-serif;
+            cursor: crosshair; user-select: none;
+            -ms-overflow-style: none; scrollbar-width: none;
+        }
+        body::-webkit-scrollbar { display: none; }
+        .container {
+            width: var(--cube-size); height: var(--cube-size);
+            display: flex; perspective: var(--perspective-value); transform-style: preserve-3d;
+        }
+        .cube {
+            position: relative; width: var(--cube-size); height: var(--cube-size);
+            transform-style: preserve-3d; margin: auto; justify-content: center;
+            transform-origin: bottom center; transform: rotateY(0deg) rotateX(0deg);
+            transition: transform 0s ease-out; z-index: 0;
+        }
+        .side {
+            position: absolute; width: var(--cube-size); height: var(--cube-size);
+            display: flex; justify-content: center; align-items: center; text-align: center;
+            word-break: keep-all; cursor: crosshair; overflow: hidden;
+            transform-style: preserve-3d; z-index: 1; backface-visibility: visible;
+        }
+        .side-content {
+            font-size: 30px; line-height: 1.2; padding: 10px; box-sizing: border-box;
+            width: 100%; height: 100%; display: flex; color: inherit;
+            justify-content: center; align-items: center;
+            transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+        }
+        .front { background-color: #ccc; transform: translateZ(calc(var(--cube-depth) * -1)); }
+        .right { background-color: #ccc; transform: rotateY(-90deg) translateZ(calc(var(--cube-depth) * -1)); }
+        .left { background-color: #ccc; transform: rotateY(90deg) translateZ(calc(var(--cube-depth) * -1)); }
+        .back { background-color: #ccc; transform: translateZ(calc(var(--cube-depth) * 1)) rotateY(180deg); }
+        .top { background-color: #ffffff; transform: rotateX(90deg) translateZ(calc(var(--cube-depth) * 1)); pointer-events: auto; }
+        .bottom { background-color: white; transform: rotateX(-90deg) translateZ(calc(var(--cube-depth) * 1)); pointer-events: auto; }
+        .ascii-canvas { width: 100%; height: 100%; display: block; background: transparent; }
+        #hiddenCanvas, #hiddenVideo { display: none; }
+        .transparent-overlay {
+            position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+            pointer-events: auto; z-index: 9999; background: transparent !important;
+        }
+        .overlay-placed-text {
+            position: absolute; font-family: 'Interop', sans-serif; font-size: 1rem;
+            font-weight: 500; line-height: 1.25; white-space: pre-wrap; word-wrap: break-word;
+            background-color: transparent; border: none; box-shadow: none; padding: 5px;
+            z-index: 2; user-select: none; color: #2b00ff !important; pointer-events: none; text-align: left;
+        }
+        .overlay-text-input-box {
+            position: absolute; z-index: 10001; display: flex; justify-content: center;
+            align-items: flex-start; pointer-events: auto; background: transparent;
+        }
+        .overlay-text-input-box textarea {
+            font-family: 'Interop', sans-serif; font-size: 1rem; font-weight: 500;
+            line-height: 1.25; color: #2b00ff !important; background: transparent; border: none; outline: none;
+            padding: 5px; margin: 0; resize: none; overflow: hidden; width: auto; min-width: 0; max-width: none;
+            height: auto; min-height: 0; max-height: none; box-sizing: border-box; text-align: left;
+            word-wrap: break-word; pointer-events: auto; display: block; caret-color: transparent; position: relative; z-index: 2;
+        }
+        .custom-caret {
+            display: block; position: absolute; width: 0.6rem; background: #2b00ff;
+            z-index: 3; pointer-events: none; animation: blink 1s steps(1) infinite;
+        }
+        @keyframes blink { 0%, 60% { opacity: 1; } 60%, 100% { opacity: 0; } }
+        .text-line-guide {
+            position: absolute; left: 0; width: 100%; height: 0; pointer-events: none;
+        }
+        .click-mark {
+            width: 1rem; height: 1rem; border-radius: 50%; background-color: #FF3300;
+            position: absolute; pointer-events: none; z-index: 10000; transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="cube">
+            <div class="side front" id="front-side">
+                <canvas class="ascii-canvas" id="asciiCanvas-front"></canvas>
+                <video id="hiddenVideo" autoplay playsinline style="display: none;"></video>
+                <canvas id="hiddenCanvas" style="display: none;"></canvas>
+            </div>
+            <div class="side back" id="back-side"><div class="side-content"></div></div>
+            <div class="side right" id="right-side"><canvas class="ascii-canvas" id="asciiCanvas-right"></canvas></div>
+            <div class="side left" id="left-side"><canvas class="ascii-canvas" id="asciiCanvas-left"></canvas></div>
+            <div class="side top" id="top-side"><div class="side-content"></div></div>
+            <div class="side bottom" id="bottom-side"><div class="side-content"></div></div>
+        </div>
+    </div>
+    <canvas id="mousePathCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:10000;"></canvas>
+    <div class="transparent-overlay" id="overlay"></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // ---- 1. webcam/ascii art 부분 (속도 최적화) ----
+        const asciiSides = [
+            { id: 'asciiCanvas-left', sideId: 'left-side' },
+            { id: 'asciiCanvas-front', sideId: 'front-side' },
+            { id: 'asciiCanvas-right', sideId: 'right-side' }
+        ];
+        const hiddenVideo = document.getElementById('hiddenVideo');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        const canvasContext = hiddenCanvas.getContext('2d', {willReadFrequently:true});
+        const asciiChars = "▉▇▆▅▄▃▂ -";
+        const charColorMap = {
+            "▉": "#9575cd", "▇": "#9575cd", "▆": "#FF3300", "▅": "#FF33FF",
+            "▄": "#00BCD4", "▃": "#66FF99", "▂": "#eb78ff", " ": "#CCFFFF", "-": "#CCFFFF"
+        };
+        let perspectiveValue = 180;
+        const container = document.querySelector('.container');
+        function updatePerspective() {
+            perspectiveValue = Math.min(Math.max(perspectiveValue, 50), 400);
+            container.style.perspective = `${perspectiveValue}px`;
+        }
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            perspectiveValue += (e.deltaY > 0) ? 25 : -25;
+            updatePerspective();
+        }, { passive: false });
+        updatePerspective();
+        const asciiCanvases = asciiSides.map(s => document.getElementById(s.id));
+        let asciiCtxs = asciiCanvases.map(c => c.getContext('2d', {willReadFrequently: true}));
+        async function startWebcamAndAsciiAllSidesSplit() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                hiddenVideo.srcObject = stream;
+                hiddenVideo.play();
+                hiddenVideo.addEventListener('loadedmetadata', () => {
+                    hiddenCanvas.width = hiddenVideo.videoWidth;
+                    hiddenCanvas.height = hiddenVideo.videoHeight;
+                    const asciiWidth = 60;
+                    const partWidth = Math.floor(hiddenVideo.videoWidth / 3);
+                    const asciiHeight = Math.floor(asciiWidth * (hiddenVideo.videoHeight / partWidth) * 0.8);
+                    asciiCanvases.forEach((canvas, idx) => {
+                        const parent = canvas.parentElement;
+                        const width = parent.offsetWidth;
+                        const height = parent.offsetHeight;
+                        let charWidthPx = Math.floor(width / asciiWidth);
+                        let charHeightPx = Math.floor(height / asciiHeight);
+                        canvas.width = asciiWidth * charWidthPx;
+                        canvas.height = asciiHeight * charHeightPx;
+                        canvas.style.width = "100%";
+                        canvas.style.height = "100%";
+                        asciiCtxs[idx] = canvas.getContext('2d', {willReadFrequently: true});
+                        asciiCtxs[idx].font = `${charHeightPx}px VT323, monospace`;
+                        asciiCtxs[idx].textBaseline = "top";
+                    });
+                    // ----- 최적화: draw 호출 빈도 낮춤, getImageData batching -----
+                    let lastDraw = 0;
+                    function drawAsciiAllSidesSplit(now) {
+                        if (!lastDraw || now - lastDraw > 66) { // 15fps 정도로 제한
+                            canvasContext.drawImage(hiddenVideo, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                            const asciiWidth = 60;
+                            const partWidth = Math.floor(hiddenCanvas.width / 3);
+                            const asciiHeight = Math.floor(asciiWidth * (hiddenCanvas.height / partWidth) * 0.8);
+                            const offsets = [0, partWidth, partWidth * 2];
+                            asciiCanvases.forEach((canvas, idx) => {
+                                const ctx = asciiCtxs[idx];
+                                const width = canvas.width;
+                                const height = canvas.height;
+                                const charWidthPx = Math.floor(width / asciiWidth);
+                                const charHeightPx = Math.floor(height / asciiHeight);
+                                ctx.clearRect(0, 0, width, height);
+                                const stepX = partWidth / asciiWidth;
+                                const stepY = hiddenCanvas.height / asciiHeight;
+                                // batch getImageData (줄 단위)
+                                for (let y = 0; y < asciiHeight; y++) {
+                                    let pixelRow = [];
+                                    for (let x = 0; x < asciiWidth; x++) {
+                                        const pixelX = Math.floor(offsets[idx] + x * stepX);
+                                        const pixelY = Math.floor(y * stepY);
+                                        if (pixelX >= offsets[idx] + partWidth) continue;
+                                        pixelRow.push([pixelX, pixelY]);
+                                    }
+                                    let rowData = canvasContext.getImageData(offsets[idx], Math.floor(y * stepY), partWidth, 1).data;
+                                    let i = 0;
+                                    for (let x = 0; x < asciiWidth; x++) {
+                                        const pixelX = Math.floor(x * stepX);
+                                        const offset = pixelX * 4;
+                                        const r = rowData[offset];
+                                        const g = rowData[offset+1];
+                                        const b = rowData[offset+2];
+                                        const brightness = (r + g + b) / 3;
+                                        const charIndex = Math.floor(brightness / 255 * (asciiChars.length - 1));
+                                        const char = asciiChars[charIndex];
+                                        const color = charColorMap[char] || "#fff";
+                                        ctx.fillStyle = color;
+                                        ctx.fillText(char, x * charWidthPx, y * charHeightPx);
+                                    }
+                                }
+                            });
+                            lastDraw = now;
+                        }
+                        requestAnimationFrame(drawAsciiAllSidesSplit);
+                    }
+                    requestAnimationFrame(drawAsciiAllSidesSplit);
+                });
+                console.log('웹캠 스트림 시작됨 (아스키 아트, 3면 분할, 최적화)');
+            } catch (err) {
+                console.error('웹캠 접근에 실패했습니다: ', err);
+                asciiCtxs.forEach(ctx => {
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "24px sans-serif";
+                    ctx.fillText("웹캠 로드 실패", 10, 40);
+                });
+                alert('웹캠에 접근할 수 없습니다. 마이크 및 카메라 권한을 확인해주세요.');
+            }
+        }
+        startWebcamAndAsciiAllSidesSplit();
+
+        // ====== 오버레이 텍스트 입력/박제 로직 (줄 스냅/정교한 굵은 커서) ======
+        const overlay = document.getElementById('overlay');
+        let overlayCurrentInputBox = null;
+        function autosizeTextarea(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.width = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            const lines = textarea.value.split('\n');
+            if (!autosizeTextarea.canvas) autosizeTextarea.canvas = document.createElement('canvas');
+            const ctx = autosizeTextarea.canvas.getContext('2d');
+            const style = window.getComputedStyle(textarea);
+            ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            let maxWidth = 0;
+            lines.forEach(line => {
+                const metrics = ctx.measureText(line || ' ');
+                if (metrics.width > maxWidth) maxWidth = metrics.width;
+            });
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            const minWidth = 50;
+            textarea.style.width = Math.max(maxWidth + paddingLeft + paddingRight + 4, minWidth) + 'px';
+        }
+        overlay.addEventListener('wheel', function(e){
+            e.preventDefault();
+            perspectiveValue += (e.deltaY > 0) ? 25 : -25;
+            updatePerspective();
+        }, { passive: false });
+
+        // ==== 텍스트 줄 가이드 및 입력 ====
+        const overlayLineCount = 24;
+        let overlayLineTops = [];
+        function makeOverlayTextLines() {
+            overlay.querySelectorAll('.text-line-guide').forEach(n => n.remove());
+            overlayLineTops = [];
+            const overlayRect = overlay.getBoundingClientRect();
+            for (let i = 0; i < overlayLineCount; i++) {
+                const y = (i + 1) * overlayRect.height / (overlayLineCount + 1);
+                overlayLineTops.push(y);
+                const line = document.createElement('div');
+                line.className = 'text-line-guide';
+                line.style.top = `${y}px`;
+                overlay.appendChild(line);
+            }
+        }
+        makeOverlayTextLines();
+        window.addEventListener('resize', makeOverlayTextLines);
+
+        overlay.addEventListener('mousemove', function(event) {
+            const mouseY = event.clientY;
+            let minDist = Infinity, closestIdx = -1;
+            overlayLineTops.forEach((y, i) => {
+                const dist = Math.abs(mouseY - y);
+                if (dist < minDist) { minDist = dist; closestIdx = i; }
+            });
+            overlay.querySelectorAll('.text-line-guide').forEach((el, idx) => {
+                if (idx === closestIdx) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+        });
+        overlay.addEventListener('mouseleave', function() {
+            overlay.querySelectorAll('.text-line-guide').forEach(el => el.classList.remove('active'));
+        });
+
+        overlay.addEventListener('click', function(event) {
+            if (overlayCurrentInputBox) {
+                finalizeOverlayTextInput(overlayCurrentInputBox.querySelector('textarea'), overlayCurrentInputBox);
+                overlayCurrentInputBox = null;
+            }
+            if (event.target.classList.contains('overlay-placed-text') ||
+                event.target.classList.contains('overlay-text-input-box') ||
+                event.target.tagName === 'TEXTAREA' ||
+                event.target.classList.contains('click-mark') ||
+                event.target.id === 'mousePathCanvas') return;
+            const overlayRect = overlay.getBoundingClientRect();
+            const x = event.clientX, y = event.clientY;
+            let minDist = Infinity, closestIdx = -1;
+            overlayLineTops.forEach((lineY, i) => {
+                const dist = Math.abs(y - lineY);
+                if (dist < minDist) { minDist = dist; closestIdx = i; }
+            });
+            const lineY = overlayLineTops[closestIdx];
+            const inputBox = document.createElement('div');
+            inputBox.className = 'overlay-text-input-box';
+            inputBox.style.left = x + 'px'; inputBox.style.top = lineY + 'px';
+            inputBox.style.transform = 'translateY(0)';
+            const textarea = document.createElement('textarea');
+            textarea.style.color = '#000000';
+            textarea.style.marginLeft = '0px';
+            inputBox.appendChild(textarea);
+            const caret = document.createElement('div');
+            caret.className = 'custom-caret'; caret.style.display = 'block';
+            inputBox.appendChild(caret);
+            overlay.appendChild(inputBox);
+            textarea.focus();
+            overlayCurrentInputBox = inputBox;
+
+            function updateCustomCaret() {
+                let value = textarea.value;
+                let selection = textarea.selectionStart;
+                let shadowDiv = document.createElement('div');
+                let style = getComputedStyle(textarea);
+                shadowDiv.style.position = 'absolute';
+                shadowDiv.style.visibility = 'hidden';
+                shadowDiv.style.whiteSpace = 'pre-wrap';
+                shadowDiv.style.wordBreak = 'break-all';
+                shadowDiv.style.overflowWrap = 'break-word';
+                shadowDiv.style.fontFamily = style.fontFamily;
+                shadowDiv.style.fontSize = style.fontSize;
+                shadowDiv.style.fontWeight = style.fontWeight;
+                shadowDiv.style.lineHeight = style.lineHeight;
+                shadowDiv.style.letterSpacing = style.letterSpacing;
+                shadowDiv.style.padding = style.padding;
+                shadowDiv.style.border = style.border;
+                shadowDiv.style.boxSizing = style.boxSizing;
+                shadowDiv.style.width = textarea.offsetWidth + 'px';
+                shadowDiv.style.height = textarea.offsetHeight + 'px';
+                shadowDiv.style.background = style.background;
+                shadowDiv.style.textAlign = style.textAlign;
+                shadowDiv.style.color = 'transparent';
+                let before = value.substring(0, selection), after = value.substring(selection);
+                before = before.replace(/\n/g, '\n'); after = after.replace(/\n/g, '\n');
+                let cursorSpan = document.createElement('span');
+                cursorSpan.textContent = "\u200b"; cursorSpan.style.display = 'inline-block';
+                shadowDiv.appendChild(document.createTextNode(before));
+                shadowDiv.appendChild(cursorSpan);
+                shadowDiv.appendChild(document.createTextNode(after));
+                document.body.appendChild(shadowDiv);
+                let taRect = textarea.getBoundingClientRect();
+                let spanRect = cursorSpan.getBoundingClientRect();
+                let shadowRect = shadowDiv.getBoundingClientRect();
+                let left = spanRect.left - shadowRect.left - textarea.scrollLeft;
+                let top = spanRect.top - shadowRect.top - textarea.scrollTop;
+                caret.style.left = left + 'px';
+                caret.style.top = top + 'px';
+                caret.style.height = style.lineHeight;
+                document.body.removeChild(shadowDiv);
+            }
+            textarea.addEventListener('input', function() { autosizeTextarea(textarea); updateCustomCaret(); });
+            textarea.addEventListener('click', updateCustomCaret);
+            textarea.addEventListener('keyup', updateCustomCaret);
+            textarea.addEventListener('select', updateCustomCaret);
+            textarea.addEventListener('scroll', updateCustomCaret);
+            textarea.addEventListener('focus', function(){ caret.style.display = 'block'; updateCustomCaret(); });
+            textarea.addEventListener('blur', function(){ caret.style.display = 'none'; });
+            setTimeout(() => { autosizeTextarea(textarea); updateCustomCaret(); }, 0);
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    finalizeOverlayTextInput(textarea, inputBox, x, lineY);
+                    overlayCurrentInputBox = null;
+                }
+            });
+            textarea.addEventListener('focusout', () => {
+                if (overlayCurrentInputBox === inputBox) {
+                    finalizeOverlayTextInput(textarea, inputBox, x, lineY);
+                    overlayCurrentInputBox = null;
+                }
+            });
+        });
+
+        function finalizeOverlayTextInput(textarea, inputBox, x, y) {
+            const text = textarea.value.trim();
+            if (text) {
+                const placedText = document.createElement('div');
+                placedText.className = 'overlay-placed-text';
+                placedText.textContent = text;
+                placedText.style.left = x + 'px'; placedText.style.top = y + 'px';
+                placedText.style.transform = 'translateY(0)';
+                placedText.style.width = textarea.offsetWidth + 'px';
+                placedText.style.whiteSpace = 'pre-wrap';
+                placedText.style.fontFamily = window.getComputedStyle(textarea).fontFamily;
+                placedText.style.fontSize = window.getComputedStyle(textarea).fontSize;
+                placedText.style.lineHeight = window.getComputedStyle(textarea).lineHeight;
+                placedText.style.padding = window.getComputedStyle(textarea).padding;
+                overlay.appendChild(placedText);
+            }
+            if (inputBox) inputBox.remove();
+        }
+
+        // ====== 기존 top/bottom 텍스트 입력 유지 ======
+        let currentInputBox = null;
+        document.getElementById('top-side').addEventListener('click', (event) => sideClickHandler(event, 'top'));
+        document.getElementById('bottom-side').addEventListener('click', (event) => sideClickHandler(event, 'bottom'));
+        function sideClickHandler(event, whichSide) {
+            const side = event.currentTarget;
+            if (currentInputBox) {
+                finalizeTextInput(currentInputBox.querySelector('textarea'), currentInputBox, currentInputBox.closest('.side'));
+                currentInputBox = null;
+            }
+            if (event.target.classList.contains('placed-text') ||
+                event.target.classList.contains('text-input-box') ||
+                event.target.tagName === 'TEXTAREA') return;
+            const rect = side.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+            const inputContainer = document.createElement('div');
+            inputContainer.className = 'text-input-box';
+            const leftPercent = (clickX / rect.width) * 100;
+            const topPercent = (clickY / rect.height) * 100;
+            let textFlipTransform = '';
+            if (whichSide === 'top' || whichSide === 'bottom') textFlipTransform = 'rotateX(180deg)';
+            inputContainer.style.left = `${leftPercent}%`; inputContainer.style.top = `${topPercent}%`;
+            inputContainer.style.transform = `translate(-50%, 0) ${textFlipTransform}`;
+            const textarea = document.createElement('textarea');
+            textarea.style.color = '#000000';
+            textarea.style.marginLeft = '0px';
+            inputContainer.appendChild(textarea);
+            side.appendChild(inputContainer);
+            textarea.focus();
+            currentInputBox = inputContainer;
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    finalizeTextInput(textarea, inputContainer, side, leftPercent, topPercent, whichSide);
+                    currentInputBox = null;
+                }
+            });
+            textarea.addEventListener('focusout', () => {
+                if (currentInputBox === inputContainer) {
+                    finalizeTextInput(textarea, inputContainer, side, leftPercent, topPercent, whichSide);
+                    currentInputBox = null;
+                }
+            });
+        }
+        function finalizeTextInput(textarea, inputContainer, parentSide, leftPercent, topPercent, whichSide) {
+            const text = textarea.value.trim();
+            if (text) {
+                const placedText = document.createElement('div');
+                placedText.className = 'placed-text';
+                placedText.textContent = text;
+                placedText.style.left = `${leftPercent}%`;
+                placedText.style.top = `${topPercent}%`;
+                let textFlipTransform = '';
+                if (whichSide === 'top' || whichSide === 'bottom') textFlipTransform = 'rotateX(180deg)';
+                placedText.style.transform = `translate(-50%, 0) ${textFlipTransform}`;
+                placedText.style.color = '#FF00FF';
+                placedText.style.fontFamily = window.getComputedStyle(textarea).fontFamily;
+                placedText.style.fontSize = window.getComputedStyle(textarea).fontSize;
+                placedText.style.lineHeight = window.getComputedStyle(textarea).lineHeight;
+                placedText.style.padding = window.getComputedStyle(textarea).padding;
+                placedText.style.width = textarea.offsetWidth + 'px';
+                parentSide.appendChild(placedText);
+            }
+            inputContainer.remove();
+        }
+
+        // ======================================
+        // 1. 커서 클릭 시 해당 위치에 모양 새기기
+        // ======================================
+        overlay.addEventListener('click', (event) => {
+            if (event.target.classList.contains('overlay-placed-text') ||
+                event.target.classList.contains('overlay-text-input-box') ||
+                event.target.tagName === 'TEXTAREA' ||
+                event.target.classList.contains('click-mark') ||
+                event.target.id === 'mousePathCanvas') return;
+            const clickMark = document.createElement('div');
+            clickMark.className = 'click-mark';
+            clickMark.style.left = `${event.clientX}px`;
+            clickMark.style.top = `${event.clientY}px`;
+            document.body.appendChild(clickMark);
+            // setTimeout(() => { clickMark.remove(); }, 1000); // 필요시 주석 해제
+        });
+
+        // ======================================
+        // 2. 마우스 움직이는 궤적을 얇은 선으로 기록하기
+        // ======================================
+        const mousePathCanvas = document.getElementById('mousePathCanvas');
+        const mousePathCtx = mousePathCanvas.getContext('2d');
+        mousePathCanvas.width = window.innerWidth;
+        mousePathCanvas.height = window.innerHeight;
+        let lastMouseX = 0, lastMouseY = 0;
+        window.addEventListener('resize', () => {
+            mousePathCanvas.width = window.innerWidth;
+            mousePathCanvas.height = window.innerHeight;
+        });
+        overlay.addEventListener('mousemove', (event) => {
+            if (event.target.classList.contains('overlay-text-input-box') ||
+                event.target.tagName === 'TEXTAREA') {
+                lastMouseX = event.clientX; lastMouseY = event.clientY; return;
+            }
+            if (lastMouseX === 0 && lastMouseY === 0) {
+                lastMouseX = event.clientX; lastMouseY = event.clientY; return;
+            }
+            mousePathCtx.beginPath();
+            mousePathCtx.moveTo(lastMouseX, lastMouseY);
+            mousePathCtx.lineTo(event.clientX, event.clientY);
+            mousePathCtx.strokeStyle = 'rgb(43, 0, 255)';
+            mousePathCtx.lineWidth = 1;
+            mousePathCtx.stroke();
+            lastMouseX = event.clientX; lastMouseY = event.clientY;
+        });
+    });
+    </script>
+</body>
+</html>
